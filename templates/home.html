@@ -2,14 +2,17 @@
 {% block content %}
   <div class="row">
 
+    <!-- Left sidebar: current user + who to follow -->
     <aside class="col-md-4 col-lg-3 col-sm-12" id="home-aside">
+
+      <!-- Current user card -->
       <div class="card user-card">
         <div>
           <div class="image-wrapper">
-            <img src="{{ g.user.header_image_url }}" alt="" class="card-hero">
+            <img src="{{ g.user.header_image_url or '/static/images/warbler-hero.jpg' }}" alt="" class="card-hero">
           </div>
           <a href="/users/{{ g.user.id }}" class="card-link">
-            <img src="{{ g.user.image_url }}"
+            <img src="{{ g.user.image_url or '/static/images/default-pic.png' }}"
                  alt="Image for {{ g.user.username }}"
                  class="card-image">
             <p>@{{ g.user.username }}</p>
@@ -42,28 +45,62 @@
           </ul>
         </div>
       </div>
+
+      <!-- Who to follow (auto-height card, won’t clip) -->
+      <div class="card suggestions-card">
+        <div class="card-inner p-3">
+          <h6 class="text-muted mb-2">Who to follow</h6>
+
+          {% if suggested_users %}
+            {% for u in suggested_users %}
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <a href="/users/{{ u.id }}" class="d-flex align-items-center">
+                  <img src="{{ u.image_url or '/static/images/default-pic.png' }}"
+                       alt="" class="timeline-image">
+                  <span class="ml-2">@{{ u.username }}</span>
+                </a>
+                <form method="POST" action="/users/follow/{{ u.id }}" class="d-inline">
+                  <button class="btn btn-sm btn-outline-primary">Follow</button>
+                </form>
+              </div>
+            {% endfor %}
+            <a href="/users" class="btn btn-link p-0">Find more people</a>
+          {% else %}
+            <p class="mb-0 text-muted">No suggestions yet.</p>
+          {% endif %}
+        </div>
+      </div>
     </aside>
 
+    <!-- Feed -->
     <div class="col-lg-6 col-md-8 col-sm-12">
       <ul class="list-group" id="messages">
         {% for msg in messages %}
           <li class="list-group-item">
-            <a href="/messages/{{ msg.id  }}" class="message-link"/>
+            <a href="/messages/{{ msg.id }}" class="message-link"></a>
+
             <a href="/users/{{ msg.user.id }}">
-              <img src="{{ msg.user.image_url }}" alt="" class="timeline-image">
+              <img src="{{ msg.user.image_url or '/static/images/default-pic.png' }}" alt="" class="timeline-image">
             </a>
+
             <div class="message-area">
               <a href="/users/{{ msg.user.id }}">@{{ msg.user.username }}</a>
               <span class="text-muted">{{ msg.timestamp.strftime('%d %B %Y') }}</span>
               <p>{{ msg.text }}</p>
             </div>
-            <form method="POST" action="/users/add_like/{{ msg.id }}" class="ml-auto d-inline like-form">
-              <button class="btn btn-link p-0"
-                      aria-label="{% if msg.id in liked_ids %}Unlike{% else %}Like{% endif %} this message"
-                      {% if msg.user_id == g.user.id %}disabled title="Can't like your own warble"{% endif %}>
-                <i class="{% if msg.id in liked_ids %}fas{% else %}far{% endif %} fa-thumbs-up"></i>
-              </button>
-            </form>
+
+            {% if g.user %}
+              {% set is_mine = (msg.user_id == g.user.id) %}
+              {% set is_liked = (msg.id in liked_ids) %}
+              <form method="POST" action="{{ url_for('toggle_like', message_id=msg.id) }}"
+                    class="ml-auto d-inline like-form">
+                <button class="btn btn-link p-0"
+                        aria-label="{% if is_liked %}Unlike{% else %}Like{% endif %} this message"
+                        {% if is_mine %}disabled title="Can't like your own warble"{% endif %}>
+                  <i class="{% if is_liked %}fas{% else %}far{% endif %} fa-thumbs-up"></i>
+                </button>
+              </form>
+            {% endif %}
           </li>
         {% endfor %}
       </ul>

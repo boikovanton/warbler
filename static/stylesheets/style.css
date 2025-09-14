@@ -20,9 +20,20 @@ body.error-404 {
   cursor: pointer;
 }
 
-/* keep like controls above the invisible message-link overlay */
-.like-form { position: relative; z-index: 3; }
-
+/* Like button positioning in message rows */
+.like-form {
+  margin-left: auto;
+  align-self: flex-start;
+  position: relative;
+  z-index: 3;
+}
+.like-form .btn {
+  border: none;
+  background: transparent;
+}
+.like-form .btn:focus {
+  box-shadow: none;
+}
 
 /* ======================= Nav */
 
@@ -197,7 +208,7 @@ nav + .container {
   margin-left: 10px;
 }
 
-/* Banner */
+/* Profile header banner */
 #warbler-hero {
   height: 220px;
   margin-top: -16px;
@@ -258,7 +269,7 @@ nav + .container {
   padding-top: 3px;
 }
 
-/* ===================== Messages list / like alignment */
+/* Message list */
 
 #messages {
   position: relative;
@@ -284,23 +295,6 @@ nav + .container {
   padding: 7px 20px 12px;
 }
 
-/* right-align like buttons in one vertical column */
-#messages .like-form {
-  margin-left: auto;
-  align-self: center;
-  position: relative;
-  z-index: 3;
-}
-
-#messages .like-form .btn {
-  padding: 0;
-}
-
-#messages .like-form i {
-  font-size: 18px;
-  line-height: 1;
-}
-
 #messages:not(.no-hover) .list-group-item:hover {
   background-color: #e6ecf0;
 }
@@ -323,11 +317,11 @@ nav + .container {
   color: #657786;
 }
 
-/* ==================== User cards on follower/following pages */
+/* ==================== Cards */
 
 .user-card {
   width: 100%;
-  padding-bottom: 100%;
+  padding-bottom: 100%;      /* keeps this card square */
   border-radius: 5px;
   border: 1px solid #ccc;
   position: relative;
@@ -338,6 +332,20 @@ nav + .container {
 .user-card > div {
   position: absolute;
   background: white;
+}
+
+/* Who-to-follow panel: auto height (no clipping) */
+.suggestions-card {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background: #fff;
+  margin-top: 20px;
+  padding: 12px;
+}
+
+.suggestions-card .timeline-image {
+  margin-right: 8px;
 }
 
 .user-card form {
@@ -530,7 +538,6 @@ p.card-bio {
   min-width: 105px;
 }
 
-/* this id is used on the single message page; keep its original positioning */
 #messages-form {
   position: absolute;
   top: 4px;

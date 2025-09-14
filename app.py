@@ -3,19 +3,22 @@ import os
 from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func  # NEW
 
 from forms import UserAddForm, LoginForm, MessageForm, EditProfileForm
-from models import db, connect_db, User, Message, Likes  # <-- added Likes
+from models import db, connect_db, User, Message, Likes, Follows  # +Follows
 
 CURR_USER_KEY = "curr_user"
 
 app = Flask(__name__)
 
-# Get DB_URI from environ variable (useful for production/testing) or,
-# if not set there, use development local db.
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    os.environ.get('DATABASE_URL', 'postgresql:///warbler'))
+# Normalize postgres:// -> postgresql:// (safety for some hosts; harmless otherwise)
+uri = os.environ.get('DATABASE_URL', 'postgresql:///warbler')
+if uri.startswith('postgres://'):
+    uri = uri.replace('postgres://', 'postgresql://', 1)
 
+# Get DB_URI from environ variable (useful for production/testing) or default local.
+app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
@@ -24,10 +27,29 @@ toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
 
+##############################################################################
+# Helpers
+
+def suggested_users_for(user, limit=5):
+    """Return a list of suggested users to follow (not me, not already followed),
+    ranked by follower count."""
+    if not user:
+        return []
+    return (
+        User.query
+            .filter(
+                User.id != user.id,
+                ~User.followers.any(id=user.id)
+            )
+            .outerjoin(Follows, Follows.user_being_followed_id == User.id)
+            .group_by(User.id)
+            .order_by(func.count(Follows.user_following_id).desc(), User.id.asc())
+            .limit(limit)
+            .all()
+    )
 
 ##############################################################################
 # User signup/login/logout
-
 
 @app.before_request
 def add_user_to_g():
@@ -37,17 +59,14 @@ def add_user_to_g():
     else:
         g.user = None
 
-
 def do_login(user):
     """Log in user."""
     session[CURR_USER_KEY] = user.id
-
 
 def do_logout():
     """Logout user."""
     if CURR_USER_KEY in session:
         del session[CURR_USER_KEY]
-
 
 @app.route('/signup', methods=["GET", "POST"])
 def signup():
@@ -73,7 +92,6 @@ def signup():
 
     return render_template('users/signup.html', form=form)
 
-
 @app.route('/login', methods=["GET", "POST"])
 def login():
     """Handle user login."""
@@ -91,7 +109,6 @@ def login():
 
     return render_template('users/login.html', form=form)
 
-
 @app.route('/logout', methods=["GET", "POST"])
 def logout():
     """Handle logout of user: clear session, flash, redirect to login."""
@@ -99,7 +116,6 @@ def logout():
     g.user = None
     flash("You have been logged out.", "success")
     return redirect("/login")
-
 
 ##############################################################################
 # General user routes:
@@ -116,7 +132,6 @@ def list_users():
 
     return render_template('users/index.html', users=users)
 
-
 @app.route('/users/<int:user_id>')
 def users_show(user_id):
     """Show user profile."""
@@ -132,7 +147,6 @@ def users_show(user_id):
     liked_ids = set([m.id for m in g.user.likes]) if g.user else set()
     return render_template('users/show.html', user=user, messages=messages, liked_ids=liked_ids)
 
-
 @app.route('/users/<int:user_id>/following')
 def show_following(user_id):
     """Show list of people this user is following."""
@@ -143,7 +157,6 @@ def show_following(user_id):
     user = User.query.get_or_404(user_id)
     return render_template('users/following.html', user=user)
 
-
 @app.route('/users/<int:user_id>/followers')
 def users_followers(user_id):
     """Show list of followers of this user."""
@@ -153,7 +166,6 @@ def users_followers(user_id):
 
     user = User.query.get_or_404(user_id)
     return render_template('users/followers.html', user=user)
-
 
 @app.route('/users/follow/<int:follow_id>', methods=['POST'])
 def add_follow(follow_id):
@@ -168,7 +180,6 @@ def add_follow(follow_id):
 
     return redirect(f"/users/{g.user.id}/following")
 
-
 @app.route('/users/stop-following/<int:follow_id>', methods=['POST'])
 def stop_following(follow_id):
     """Have currently-logged-in-user stop following this user."""
@@ -181,7 +192,6 @@ def stop_following(follow_id):
     db.session.commit()
 
     return redirect(f"/users/{g.user.id}/following")
-
 
 @app.route('/users/profile', methods=["GET", "POST"])
 def profile():
@@ -222,7 +232,6 @@ def profile():
 
     return render_template('users/edit.html', form=form)
 
-
 @app.route('/users/delete', methods=["POST"])
 def delete_user():
     """Delete user."""
@@ -236,7 +245,6 @@ def delete_user():
     db.session.commit()
 
     return redirect("/signup")
-
 
 ##############################################################################
 # Likes routes
@@ -263,14 +271,6 @@ def toggle_like(message_id):
     db.session.commit()
     return redirect(request.referrer or "/")
 
-
-# ---- Backwards-compatibility for older templates/links ----
-@app.post('/users/add_like/<int:message_id>')
-def add_like_compat(message_id):
-    """Accept old /users/add_like/<id> and forward to the new toggle."""
-    return toggle_like(message_id)
-
-
 @app.get('/users/<int:user_id>/likes')
 def show_likes(user_id):
     """Show messages this user has liked."""
@@ -283,59 +283,14 @@ def show_likes(user_id):
     liked_ids = set([m.id for m in g.user.likes]) if g.user else set()
     return render_template("users/likes.html", user=user, messages=messages, liked_ids=liked_ids)
 
-
-##############################################################################
-# Messages routes:
-
-@app.route('/messages/new', methods=["GET", "POST"])
-def messages_add():
-    """Add a message: show form if GET; on valid POST, create."""
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
-
-    form = MessageForm()
-
-    if form.validate_on_submit():
-        msg = Message(text=form.text.data)
-        g.user.messages.append(msg)
-        db.session.commit()
-
-        return redirect(f"/users/{g.user.id}")
-
-    return render_template('messages/new.html', form=form)
-
-
-@app.route('/messages/<int:message_id>', methods=["GET"])
-def messages_show(message_id):
-    """Show a message."""
-    msg = Message.query.get(message_id)
-    return render_template('messages/show.html', message=msg)
-
-
-@app.route('/messages/<int:message_id>/delete', methods=["POST"])
-def messages_destroy(message_id):
-    """Delete a message."""
-    if not g.user:
-        flash("Access unauthorized.", "danger")
-        return redirect("/")
-
-    msg = Message.query.get(message_id)
-    db.session.delete(msg)
-    db.session.commit()
-
-    return redirect(f"/users/{g.user.id}")
-
-
 ##############################################################################
 # Homepage and error pages
-
 
 @app.route('/')
 def homepage():
     """Show homepage:
-    - anon users: no messages
-    - logged in: 100 most recent messages from self + people they follow
+    - anon users: splash page
+    - logged in: follow feed; if empty, show global recent + suggestions
     """
     if not g.user:
         return render_template('home-anon.html')
@@ -346,14 +301,25 @@ def homepage():
                 .order_by(Message.timestamp.desc())
                 .limit(100)
                 .all())
-    liked_ids = set([m.id for m in g.user.likes])
-    return render_template('home.html', messages=messages, liked_ids=liked_ids)
 
+    # Fallback for brand-new users with an empty feed
+    if not g.user.following:
+        messages = (Message.query
+                    .order_by(Message.timestamp.desc())
+                    .limit(50)
+                    .all())
+        flash("Your feed is empty. Here are recent posts—follow people to customize it!", "info")
+
+    liked_ids = set(m.id for m in g.user.likes)
+    suggested = suggested_users_for(g.user, limit=5)
+
+    return render_template('home.html',
+                           messages=messages,
+                           liked_ids=liked_ids,
+                           suggested_users=suggested)
 
 ##############################################################################
 # Turn off all caching in Flask
-#   (useful for dev; in production, this kind of stuff is typically
-#   handled elsewhere)
 
 @app.after_request
 def add_header(req):

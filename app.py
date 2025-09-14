@@ -284,6 +284,32 @@ def show_likes(user_id):
     return render_template("users/likes.html", user=user, messages=messages, liked_ids=liked_ids)
 
 ##############################################################################
+# Messages routes
+
+@app.route('/messages/new', methods=['GET', 'POST'], strict_slashes=False)
+def messages_add():
+    """Add a message: show form if GET; on valid POST, create."""
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    form = MessageForm()
+
+    if form.validate_on_submit():
+        msg = Message(text=form.text.data)
+        g.user.messages.append(msg)
+        db.session.commit()
+        return redirect(f"/users/{g.user.id}")
+
+    return render_template('messages/new.html', form=form)
+
+@app.route('/messages/<int:message_id>', methods=['GET'], strict_slashes=False)
+def messages_show(message_id):
+    """Show a message."""
+    msg = Message.query.get_or_404(message_id)
+    return render_template('messages/show.html', message=msg)
+
+##############################################################################
 # Homepage and error pages
 
 @app.route('/')

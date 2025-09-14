@@ -1,0 +1,38 @@
+{% extends 'users/detail.html' %}
+
+{% block user_details %}
+  <div class="col-sm-6">
+    <h5 class="mb-3">Liked Warbles</h5>
+    <ul class="list-group" id="messages">
+      {% for message in messages %}
+        <li class="list-group-item">
+          <a href="/messages/{{ message.id }}" class="message-link"></a>
+
+          <a href="/users/{{ message.user.id }}">
+            <img src="{{ message.user.image_url or '/static/images/default-pic.png' }}"
+                 alt="user image" class="timeline-image">
+          </a>
+
+          <div class="message-area">
+            <a href="/users/{{ message.user.id }}">@{{ message.user.username }}</a>
+            <span class="text-muted">{{ message.timestamp.strftime('%d %B %Y') }}</span>
+            <p>{{ message.text }}</p>
+          </div>
+
+          {% if g.user %}
+            {% set is_mine = (message.user_id == g.user.id) %}
+            {% set is_liked = (message.id in liked_ids) %}
+            <form method="POST" action="{{ url_for('toggle_like', message_id=message.id) }}"
+                  class="ml-auto d-inline like-form">
+              <button class="btn btn-link p-0"
+                      aria-label="{% if is_liked %}Unlike{% else %}Like{% endif %} this message"
+                      {% if is_mine %}disabled title="Can't like your own warble"{% endif %}>
+                <i class="{% if is_liked %}fas{% else %}far{% endif %} fa-thumbs-up"></i>
+              </button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

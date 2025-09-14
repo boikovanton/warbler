@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="row justify-content-md-center">
+  <div class="col-md-6">
+    <h2 class="join-message">Edit Your Profile</h2>
+    <form method="POST" id="user_form">
+      {{ form.hidden_tag() }}
+
+      <!-- Username -->
+      <div class="form-group">
+        {{ form.username.label }}
+        {% for error in form.username.errors %}
+          <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {{ form.username(class="form-control") }}
+      </div>
+
+      <!-- Email -->
+      <div class="form-group">
+        {{ form.email.label }}
+        {% for error in form.email.errors %}
+          <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {{ form.email(class="form-control") }}
+      </div>
+
+      <!-- Profile Image URL -->
+      <div class="form-group">
+        {{ form.image_url.label }}
+        {% for error in form.image_url.errors %}
+          <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {{ form.image_url(class="form-control") }}
+      </div>
+
+      <!-- Header Image URL -->
+      <div class="form-group">
+        {{ form.header_image_url.label }}
+        {% for error in form.header_image_url.errors %}
+          <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {{ form.header_image_url(class="form-control") }}
+      </div>
+
+      <!-- Location -->
+      <div class="form-group">
+        {{ form.location.label }}
+        {% for error in form.location.errors %}
+          <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {{ form.location(class="form-control") }}
+      </div>
+
+      <!-- Bio -->
+      <div class="form-group">
+        {{ form.bio.label }}
+        {% for error in form.bio.errors %}
+          <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {{ form.bio(class="form-control", rows="4") }}
+      </div>
+
+      <!-- Password confirmation -->
+      <p>To confirm changes, enter your password:</p>
+      <div class="form-group">
+        {% for error in form.password.errors %}
+          <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {{ form.password(placeholder="Enter your password to confirm", class="form-control") }}
+      </div>
+
+      <!-- Buttons -->
+      <div class="edit-btn-area mt-3">
+        <button class="btn btn-success">Save Changes</button>
+        <a href="/users/{{ g.user.id }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
